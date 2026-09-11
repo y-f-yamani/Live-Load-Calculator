@@ -4,6 +4,8 @@ import { NumberField, TextField } from './Fields';
 import { createSupports, newId } from '../domain/defaults';
 import type { Floor, Machine, Project, Scenario } from '../domain/schema';
 import type { Translator } from '../i18n/messages';
+import { SceneAppearance } from './SceneAppearance';
+import { assetLabels } from '../i18n/sceneLabels';
 
 export function Inspector({
   project,
@@ -52,6 +54,7 @@ export function Inspector({
       {tab === 'machine' ? (
         <div className="inspector-body" key={machine.id}>
           <div className="section-eyebrow">{t('selected')}</div>
+          <div className="tiny-tag">{t(assetLabels[machine.kind])}</div>
           <TextField
             label={t('machineName')}
             value={machine.name}
@@ -91,57 +94,76 @@ export function Inspector({
           <p className="field-help">
             {t('massHelp')} {t('unknownHelp')}
           </p>
-          <div className="field-grid">
+          <fieldset className="geometry-fields" disabled={machine.locked}>
+            <div className="field-grid">
+              <NumberField
+                label={t('width')}
+                value={machine.width}
+                onChange={(width) => onMachine({ width: width! })}
+                required
+                min={0.05}
+                max={1000}
+                unit="m"
+                t={t}
+              />
+              <NumberField
+                label={t('length')}
+                value={machine.length}
+                onChange={(length) => onMachine({ length: length! })}
+                required
+                min={0.05}
+                max={1000}
+                unit="m"
+                t={t}
+              />
+            </div>
+            <div className="field-grid">
+              <NumberField
+                label={t('positionX')}
+                value={machine.x}
+                onChange={(x) => onMachine({ x: x! })}
+                required
+                min={-1000}
+                max={1000}
+                unit="m"
+                t={t}
+              />
+              <NumberField
+                label={t('positionY')}
+                value={machine.y}
+                onChange={(y) => onMachine({ y: y! })}
+                required
+                min={-1000}
+                max={1000}
+                unit="m"
+                t={t}
+              />
+            </div>
             <NumberField
-              label={t('width')}
-              value={machine.width}
-              onChange={(width) => onMachine({ width: width! })}
+              label={t('rotation')}
+              value={machine.rotation}
+              onChange={(rotation) => onMachine({ rotation: rotation! })}
               required
-              min={0.05}
-              max={1000}
-              unit="m"
+              max={359.999}
+              unit="°"
               t={t}
             />
             <NumberField
-              label={t('length')}
-              value={machine.length}
-              onChange={(length) => onMachine({ length: length! })}
+              label={t('height')}
+              value={machine.height}
+              onChange={(height) => onMachine({ height: height! })}
               required
-              min={0.05}
-              max={1000}
+              min={0.015}
+              max={100}
               unit="m"
               t={t}
             />
-          </div>
-          <div className="field-grid">
-            <NumberField
-              label={t('positionX')}
-              value={machine.x}
-              onChange={(x) => onMachine({ x: x! })}
-              required
-              min={-1000}
-              max={1000}
-              unit="m"
-              t={t}
-            />
-            <NumberField
-              label={t('positionY')}
-              value={machine.y}
-              onChange={(y) => onMachine({ y: y! })}
-              required
-              min={-1000}
-              max={1000}
-              unit="m"
-              t={t}
-            />
-          </div>
-          <NumberField
-            label={t('rotation')}
-            value={machine.rotation}
-            onChange={(rotation) => onMachine({ rotation: rotation! })}
-            required
-            max={359.999}
-            unit="°"
+          </fieldset>
+          <p className="field-help">{t('heightHelp')}</p>
+          <SceneAppearance
+            color={machine.color}
+            locked={machine.locked}
+            onChange={onMachine}
             t={t}
           />
           <div className="field">

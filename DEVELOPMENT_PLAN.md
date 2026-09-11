@@ -221,4 +221,8 @@ No automatic drawing interpretation or AI-generated structural capacity in the f
 
 ## Immediate next step
 
+### Implemented 3D expansion — version 0.2.0
+
+The HTML application now includes a Three.js editor with five weighted object presets, four shared floor-segment presets, placement, direct movement, rotation/resize handles, exact dimensions, colors, locking, duplication, deletion and undo/redo. English/Arabic, themes, 2D coordinates, calculations, evidence, local saving and reports share the same versioned model. Legacy projects migrate with their values and references preserved. This visual expansion supplies layout planning; independently validated structural analysis remains a later engineering stage.
+
 With the user's requested go-ahead, develop the guided HTML prototype and load-calculation MVP for non-specialists in Saudi Arabia, including English/Arabic, light/dark/system themes, and the explained data-confidence percentage, using clearly identified fictional examples. The application itself will collect floor and machine details from each user. It can calculate known load demands and produce an engineer-ready information pack even when actual floor capacity is unavailable. Add verified-limit comparisons and separately validated structural modules as the necessary engineering basis becomes available.

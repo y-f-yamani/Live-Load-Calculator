@@ -2,18 +2,40 @@ import { evidenceIds, type EvidenceId, type Project, type Scenario } from './sch
 import { machineDemand } from './calculations';
 export const RUBRIC_VERSION = 'evidence-1.0';
 
+/** Stable across import validation and object construction order. */
+function signature(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) => {
+    if (item && typeof item === 'object' && !Array.isArray(item))
+      return Object.fromEntries(
+        Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      );
+    return item;
+  });
+}
+
+function withoutAppearance(value: object) {
+  const copy: Record<string, unknown> = { ...value };
+  delete copy.color;
+  delete copy.locked;
+  return copy;
+}
+
+function floorContext(project: Project) {
+  return { ...project.floor, segments: project.floor.segments.map(withoutAppearance) };
+}
+
 export function physicalSignature(project: Project, scenario: Scenario): string {
-  return JSON.stringify({
+  return signature({
     identity: [project.name, project.site, project.codeBasis],
-    floor: project.floor,
-    machines: scenario.machines,
+    floor: floorContext(project),
+    machines: scenario.machines.map(withoutAppearance),
     backgroundLoad: scenario.backgroundLoad,
   });
 }
 
 export function reviewSignature(project: Project, scenario: Scenario): string {
   const { reference, supportLimit, minContactArea, totalLimit } = scenario.review;
-  return JSON.stringify([
+  return signature([
     physicalSignature(project, scenario),
     reference,
     supportLimit,
@@ -26,7 +48,7 @@ export function evidenceSignature(key: EvidenceId, project: Project, scenario: S
   const values: Record<EvidenceId, unknown> = {
     identity: [project.name, project.site, project.codeBasis],
     geometry: [
-      project.floor,
+      floorContext(project),
       scenario.machines.map((m) => [
         m.id,
         m.x,
@@ -34,10 +56,11 @@ export function evidenceSignature(key: EvidenceId, project: Project, scenario: S
         m.width,
         m.length,
         m.rotation,
+        m.height,
         m.supports.map((s) => [s.x, s.y]),
       ]),
     ],
-    construction: project.floor,
+    construction: floorContext(project),
     capacity: reviewSignature(project, scenario),
     path: physicalSignature(project, scenario),
     machine: scenario.machines.map((m) => [m.id, m.mass, m.contents]),
@@ -49,11 +72,15 @@ export function evidenceSignature(key: EvidenceId, project: Project, scenario: S
       m.reactionMode,
       m.supports,
     ]),
-    concurrent: [scenario.backgroundLoad, project.floor, scenario.machines],
+    concurrent: [
+      scenario.backgroundLoad,
+      floorContext(project),
+      scenario.machines.map(withoutAppearance),
+    ],
     operation: scenario.machines.map((m) => [m.id, m.mass, m.contents, m.operation]),
     installation: physicalSignature(project, scenario),
   };
-  return JSON.stringify(values[key]);
+  return signature(values[key]);
 }
 
 export function evidenceEligibility(

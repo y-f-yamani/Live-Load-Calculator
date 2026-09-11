@@ -5,6 +5,7 @@ import { machineDemand } from '../domain/calculations';
 import { formatNumber } from '../domain/numbers';
 import { placementIssues } from '../domain/geometry';
 import type { Locale, Translator } from '../i18n/messages';
+import { PALETTE } from '../domain/scene';
 
 export function FloorPlan({
   floor,
@@ -13,6 +14,8 @@ export function FloorPlan({
   onSelect,
   onMove,
   onRotate,
+  selectedSegmentId,
+  onSelectSegment,
   locale,
   t,
 }: {
@@ -22,6 +25,8 @@ export function FloorPlan({
   onSelect: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
   onRotate: (id: string) => void;
+  selectedSegmentId?: string;
+  onSelectSegment: (id: string) => void;
   locale: Locale;
   t: Translator;
 }) {
@@ -166,6 +171,44 @@ export function FloorPlan({
               </text>
             </g>
           ))}
+          {floor.segments.map((segment) => (
+            <g
+              key={segment.id}
+              transform={`translate(${segment.x} ${segment.y}) rotate(${segment.rotation})`}
+              role="button"
+              tabIndex={0}
+              aria-label={segment.name}
+              aria-pressed={selectedSegmentId === segment.id}
+              onClick={() => onSelectSegment(segment.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectSegment(segment.id);
+                }
+              }}
+              className="segment-plan-shape"
+            >
+              <rect
+                x={-segment.width / 2}
+                y={-segment.length / 2}
+                width={segment.width}
+                height={segment.length}
+                fill={PALETTE[segment.color]}
+                fillOpacity={segment.kind === 'zone' ? 0.15 : 0.45}
+                stroke={PALETTE[segment.color]}
+                strokeWidth={selectedSegmentId === segment.id ? 0.09 : 0.03}
+                strokeDasharray={segment.kind === 'zone' ? '.15 .1' : undefined}
+              />
+              <text
+                textAnchor="middle"
+                y={-segment.length / 2 - fs * 0.2}
+                fontSize={fs * 0.6}
+                className="dimension-text"
+              >
+                {segment.name}
+              </text>
+            </g>
+          ))}
           {machines.map((machine, index) => {
             const demand = machineDemand(machine);
             const selected = machine.id === selectedId;
@@ -185,6 +228,7 @@ export function FloorPlan({
                   e.preventDefault();
                   onSelect(machine.id);
                   e.currentTarget.focus();
+                  if (machine.locked) return;
                   drag.current = { id: machine.id, dx: p.x - machine.x, dy: p.y - machine.y };
                   svg.current?.setPointerCapture(e.pointerId);
                 }}
@@ -195,7 +239,7 @@ export function FloorPlan({
                   }
                   if (e.key.toLowerCase() === 'r') {
                     e.preventDefault();
-                    onRotate(machine.id);
+                    if (!machine.locked) onRotate(machine.id);
                   }
                   const delta: Record<string, [number, number]> = {
                     ArrowLeft: [-0.25, 0],
@@ -203,7 +247,7 @@ export function FloorPlan({
                     ArrowUp: [0, -0.25],
                     ArrowDown: [0, 0.25],
                   };
-                  if (delta[e.key]) {
+                  if (delta[e.key] && !machine.locked) {
                     e.preventDefault();
                     onMove(machine.id, machine.x + delta[e.key][0], machine.y + delta[e.key][1]);
                   }

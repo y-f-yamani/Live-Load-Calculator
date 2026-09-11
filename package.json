@@ -1,6 +1,6 @@
 {
   "name": "live-load-calculator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Bilingual machine load planning and documented floor assessment workspace.",
   "type": "module",
@@ -23,6 +23,7 @@
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "three": "^0.186.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -30,6 +31,7 @@
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.2",

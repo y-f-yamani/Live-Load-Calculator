@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   Layers3,
   LayoutDashboard,
@@ -21,9 +21,25 @@ import {
   ShieldCheck,
   Check,
   FilePlus2,
+  Undo2,
+  Redo2,
+  LockKeyhole,
 } from 'lucide-react';
-import { createMachine, createProject, newId } from './domain/defaults';
-import type { Machine, Project, Scenario } from './domain/schema';
+import { createProject, newId } from './domain/defaults';
+import type { Machine, Scenario, Segment } from './domain/schema';
+import {
+  createLoad,
+  createSegment,
+  resizeLoad,
+  snapCoordinate,
+  type Selection,
+  type SceneTransform,
+} from './domain/scene';
+import { useProjectHistory } from './hooks/useProjectHistory';
+import type { AssetPreset, EditorTool } from './scene/SceneEngine';
+import { assetLabels } from './i18n/sceneLabels';
+import { ObjectLibrary } from './components/ObjectLibrary';
+import { SegmentInspector } from './components/SegmentInspector';
 import { scenarioDemand, machineDemand } from './domain/calculations';
 import { formatNumber } from './domain/numbers';
 import { downloadProject, loadProject, parseProject, saveProject } from './infrastructure/storage';
@@ -37,14 +53,26 @@ import { EvidenceView } from './components/EvidenceView';
 import { CompareView } from './components/CompareView';
 import { Report } from './components/Report';
 
+const ThreeScene = lazy(() => import('./components/ThreeScene'));
+
 export default function App() {
   const [initial] = useState(loadProject);
-  const [project, setProject] = useState<Project>(() => initial.project ?? createProject());
+  const { project, setProject, canUndo, canRedo, undo, redo } = useProjectHistory(
+    () => initial.project ?? createProject(),
+  );
   const [selectedId, setSelectedId] = useState(project.scenarios[0].machines[0].id);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
+  const [editorTool, setEditorTool] = useState<EditorTool>('move');
+  const [placing, setPlacing] = useState<AssetPreset | null>(null);
+  const [snap, setSnap] = useState(true);
+  const [labels, setLabels] = useState(true);
   const [view, setView] = useState<'workspace' | 'evidence' | 'compare'>('workspace');
   const [saveError, setSaveError] = useState(false);
   const [savingPaused, setSavingPaused] = useState(initial.error);
-  const [notice, setNotice] = useState(initial.error ? 'recovered' : '');
+  const [notice, setNotice] = useState(
+    initial.error ? 'recovered' : initial.migrated ? 'migratedProject' : '',
+  );
   const [reportLanguage, setReportLanguage] = useState<Locale | 'both'>('en');
   const [printDate, setPrintDate] = useState(new Date());
   const helpDialog = useRef<HTMLDialogElement>(null);
@@ -53,6 +81,15 @@ export default function App() {
   const t = translate(locale);
   const scenario = project.scenarios.find((s) => s.id === project.activeScenarioId)!;
   const machine = scenario.machines.find((m) => m.id === selectedId) ?? scenario.machines[0];
+  const segment = project.floor.segments.find((s) => s.id === selectedSegmentId);
+  const selection: Selection = segment
+    ? { type: 'segment', id: segment.id }
+    : { type: 'load', id: machine.id };
+  const selectObject = (next: Selection) => {
+    if (!validDrafts()) return;
+    setSelectedSegmentId(next.type === 'segment' ? next.id : null);
+    if (next.type === 'load') setSelectedId(next.id);
+  };
   const demand = scenarioDemand(scenario, project.floor);
   const selectedDemand = machineDemand(machine);
   useAssessmentTool(project);
@@ -77,10 +114,117 @@ export default function App() {
       ...p,
       scenarios: p.scenarios.map((s) =>
         s.id === p.activeScenarioId
-          ? { ...s, machines: s.machines.map((m) => (m.id === id ? { ...m, ...patch } : m)) }
+          ? { ...s, machines: s.machines.map((m) => (m.id === id ? resizeLoad(m, patch) : m)) }
           : s,
       ),
     }));
+  const patchSegment = (id: string, patch: Partial<Segment>) =>
+    setProject((p) => ({
+      ...p,
+      floor: {
+        ...p.floor,
+        segments: p.floor.segments.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      },
+    }));
+  const transformObject = (target: Selection, patch: Partial<SceneTransform>) => {
+    if (!validDrafts()) return;
+    if (target.type === 'load') {
+      const item = scenario.machines.find((m) => m.id === target.id);
+      if (item && !item.locked) patchMachine(target.id, patch);
+    } else {
+      const item = project.floor.segments.find((s) => s.id === target.id);
+      if (item && !item.locked)
+        patchSegment(target.id, item.kind === 'zone' ? { ...patch, height: item.height } : patch);
+    }
+  };
+  const addAsset = (asset: AssetPreset, x: number, y: number) => {
+    if (!validDrafts()) return;
+    if (
+      (asset.type === 'load' && scenario.machines.length >= 30) ||
+      (asset.type === 'segment' && project.floor.segments.length >= 40)
+    ) {
+      setNotice('placementLimit');
+      return;
+    }
+    const position = { x: snapCoordinate(x, snap), y: snapCoordinate(y, snap) };
+    if (asset.type === 'load') {
+      const item = {
+        ...createLoad(
+          asset.kind,
+          `${t(assetLabels[asset.kind])} ${scenario.machines.length + 1}`,
+          project.floor,
+        ),
+        ...position,
+      };
+      patchScenario({ machines: [...scenario.machines, item] });
+      selectObject({ type: 'load', id: item.id });
+    } else {
+      const item = {
+        ...createSegment(
+          asset.kind,
+          `${t(assetLabels[asset.kind])} ${project.floor.segments.length + 1}`,
+          project.floor,
+        ),
+        ...position,
+      };
+      setProject((p) => ({ ...p, floor: { ...p.floor, segments: [...p.floor.segments, item] } }));
+      selectObject({ type: 'segment', id: item.id });
+    }
+    setPlacing(null);
+  };
+  const duplicateObject = () => {
+    if (!validDrafts()) return;
+    if (segment) {
+      if (project.floor.segments.length >= 40) {
+        setNotice('placementLimit');
+        return;
+      }
+      const item = {
+        ...structuredClone(segment),
+        id: newId(),
+        name: `${segment.name} · ${t('copied')}`.slice(0, 160),
+        x: snapCoordinate(segment.x + 0.5, snap),
+        y: snapCoordinate(segment.y + 0.5, snap),
+        locked: false,
+      };
+      setProject((p) => ({ ...p, floor: { ...p.floor, segments: [...p.floor.segments, item] } }));
+      selectObject({ type: 'segment', id: item.id });
+    } else {
+      if (scenario.machines.length >= 30) {
+        setNotice('placementLimit');
+        return;
+      }
+      const item = {
+        ...structuredClone(machine),
+        id: newId(),
+        name: `${machine.name} · ${t('copied')}`.slice(0, 160),
+        x: snapCoordinate(machine.x + 0.5, snap),
+        y: snapCoordinate(machine.y + 0.5, snap),
+        locked: false,
+        supports: machine.supports.map((s) => ({ ...s, id: newId() })),
+      };
+      patchScenario({ machines: [...scenario.machines, item] });
+      selectObject({ type: 'load', id: item.id });
+    }
+  };
+  const deleteObject = () => {
+    if (!validDrafts()) return;
+    if (segment) {
+      if (!segment.locked && window.confirm(t('deleteSegmentConfirm'))) {
+        setProject((p) => ({
+          ...p,
+          floor: { ...p.floor, segments: p.floor.segments.filter((s) => s.id !== segment.id) },
+        }));
+        setSelectedSegmentId(null);
+      }
+    } else if (
+      !machine.locked &&
+      scenario.machines.length > 1 &&
+      window.confirm(t('deleteMachineConfirm'))
+    ) {
+      patchScenario({ machines: scenario.machines.filter((m) => m.id !== machine.id) });
+    }
+  };
   const duplicate = () => {
     if (project.scenarios.length >= 12) return;
     const copy = structuredClone(scenario);
@@ -345,19 +489,84 @@ export default function App() {
                 </div>
               )}
               <div className="workspace-grid">
-                <Inspector
-                  project={project}
-                  scenario={scenario}
-                  machine={machine}
-                  onMachine={(patch) => patchMachine(machine.id, patch)}
-                  onFloor={(patch) =>
-                    setProject((p) => ({ ...p, floor: { ...p.floor, ...patch } }))
-                  }
-                  onScenario={patchScenario}
-                  onProject={(patch) => setProject((p) => ({ ...p, ...patch }))}
-                  t={t}
-                />
+                <div className="editor-sidebar">
+                  <ObjectLibrary
+                    placing={placing}
+                    onChoose={(asset) => {
+                      if (validDrafts()) {
+                        setPlacing(asset);
+                        setViewMode('3d');
+                      }
+                    }}
+                    t={t}
+                  />
+                  {segment ? (
+                    <SegmentInspector
+                      segment={segment}
+                      onChange={(patch) => patchSegment(segment.id, patch)}
+                      onDelete={deleteObject}
+                      onDuplicate={duplicateObject}
+                      t={t}
+                    />
+                  ) : (
+                    <Inspector
+                      project={project}
+                      scenario={scenario}
+                      machine={machine}
+                      onMachine={(patch) => patchMachine(machine.id, patch)}
+                      onFloor={(patch) =>
+                        setProject((p) => ({ ...p, floor: { ...p.floor, ...patch } }))
+                      }
+                      onScenario={patchScenario}
+                      onProject={(patch) => setProject((p) => ({ ...p, ...patch }))}
+                      t={t}
+                    />
+                  )}
+                </div>
                 <div className="canvas-column">
+                  <div className="editor-view-bar">
+                    <div className="segmented">
+                      {(['3d', '2d'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          className={viewMode === mode ? 'selected' : ''}
+                          aria-pressed={viewMode === mode}
+                          onClick={() => {
+                            if (validDrafts()) {
+                              setViewMode(mode);
+                              setPlacing(null);
+                            }
+                          }}
+                        >
+                          {t(mode === '3d' ? 'view3d' : 'view2d')}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="scene-actions">
+                      <button
+                        className="icon-button"
+                        disabled={!canUndo}
+                        title={t('undo')}
+                        aria-label={t('undo')}
+                        onClick={() => {
+                          if (validDrafts()) undo();
+                        }}
+                      >
+                        <Undo2 size={18} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        disabled={!canRedo}
+                        title={t('redo')}
+                        aria-label={t('redo')}
+                        onClick={() => {
+                          if (validDrafts()) redo();
+                        }}
+                      >
+                        <Redo2 size={18} />
+                      </button>
+                    </div>
+                  </div>
                   <div className="metrics-row">
                     <div className="metric-card">
                       <span>{t('totalMachine')}</span>
@@ -392,24 +601,80 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <FloorPlan
-                    floor={project.floor}
-                    machines={scenario.machines}
-                    selectedId={machine.id}
-                    onSelect={setSelectedId}
-                    onMove={(id, x, y) =>
-                      patchMachine(id, {
-                        x: Math.max(-1000, Math.min(1000, x)),
-                        y: Math.max(-1000, Math.min(1000, y)),
-                      })
-                    }
-                    onRotate={(id) => {
-                      const m = scenario.machines.find((s) => s.id === id)!;
-                      patchMachine(id, { rotation: (m.rotation + 90) % 360 });
-                    }}
-                    locale={locale}
-                    t={t}
-                  />
+                  {viewMode === '3d' ? (
+                    <Suspense
+                      fallback={
+                        <div className="panel three-loading" role="status">
+                          {t('loading3d')}
+                        </div>
+                      }
+                    >
+                      <ThreeScene
+                        model={{
+                          floor: project.floor,
+                          machines: scenario.machines,
+                          selection,
+                          tool: editorTool,
+                          snap,
+                          labels,
+                          locale,
+                          placing,
+                          onSelect: selectObject,
+                          onTransform: transformObject,
+                          onPlace: (x, y) => {
+                            if (placing) addAsset(placing, x, y);
+                          },
+                          onCancelPlacement: () => setPlacing(null),
+                          onDelete: deleteObject,
+                          onDuplicate: duplicateObject,
+                        }}
+                        onTool={setEditorTool}
+                        onLabels={setLabels}
+                        onSnap={setSnap}
+                        onUse2d={() => setViewMode('2d')}
+                        onDropAsset={addAsset}
+                        onAddAtCenter={() => {
+                          if (placing)
+                            addAsset(placing, project.floor.width / 2, project.floor.length / 2);
+                        }}
+                      />
+                    </Suspense>
+                  ) : (
+                    <FloorPlan
+                      floor={project.floor}
+                      machines={scenario.machines}
+                      selectedId={segment ? '' : machine.id}
+                      onSelect={(id) => selectObject({ type: 'load', id })}
+                      selectedSegmentId={segment?.id}
+                      onSelectSegment={(id) => selectObject({ type: 'segment', id })}
+                      onMove={(id, x, y) =>
+                        transformObject(
+                          { type: 'load', id },
+                          {
+                            x: Math.max(-1000, Math.min(1000, x)),
+                            y: Math.max(-1000, Math.min(1000, y)),
+                          },
+                        )
+                      }
+                      onRotate={(id) => {
+                        if (segment && !id) {
+                          transformObject(
+                            { type: 'segment', id: segment.id },
+                            { rotation: (segment.rotation + 90) % 360 },
+                          );
+                          return;
+                        }
+                        const m = scenario.machines.find((s) => s.id === id);
+                        if (m)
+                          transformObject(
+                            { type: 'load', id },
+                            { rotation: (m.rotation + 90) % 360 },
+                          );
+                      }}
+                      locale={locale}
+                      t={t}
+                    />
+                  )}
                   <section className="panel machine-list">
                     <div className="section-row">
                       <h3>
@@ -420,13 +685,11 @@ export default function App() {
                         className="text-button"
                         disabled={scenario.machines.length >= 30}
                         onClick={() => {
-                          const m = createMachine(
-                            `${t('machine')} ${String(scenario.machines.length + 1).padStart(2, '0')}`,
+                          addAsset(
+                            { type: 'load', kind: 'machine' },
+                            project.floor.width / 2,
+                            project.floor.length / 2,
                           );
-                          m.x = Math.min(project.floor.width / 2, machine.x + machine.width + 0.5);
-                          m.y = Math.min(project.floor.length / 2, machine.y);
-                          patchScenario({ machines: [...scenario.machines, m] });
-                          setSelectedId(m.id);
                         }}
                       >
                         <Plus size={16} />
@@ -436,16 +699,19 @@ export default function App() {
                     {scenario.machines.map((m, index) => (
                       <div
                         key={m.id}
-                        className={`machine-list-row ${m.id === machine.id ? 'selected' : ''}`}
+                        className={`machine-list-row ${!segment && m.id === machine.id ? 'selected' : ''}`}
                       >
-                        <button onClick={() => setSelectedId(m.id)}>
+                        <button onClick={() => selectObject({ type: 'load', id: m.id })}>
                           <span className="machine-list-icon">
                             <Box size={19} />
                           </span>
                           <span>
-                            <strong>{m.name || t('blankName')}</strong>
+                            <strong>
+                              {m.name || t('blankName')} {m.locked && <LockKeyhole size={12} />}
+                            </strong>
                             <small dir="ltr">
-                              M{String(index + 1).padStart(2, '0')} · {m.width} × {m.length} m
+                              M{String(index + 1).padStart(2, '0')} · {m.width} × {m.length} ×{' '}
+                              {m.height} m
                             </small>
                           </span>
                           <span className="machine-list-load" dir="ltr">
@@ -454,7 +720,7 @@ export default function App() {
                         </button>
                         <button
                           className="icon-button"
-                          disabled={scenario.machines.length === 1}
+                          disabled={scenario.machines.length === 1 || m.locked}
                           aria-label={`${t('removeMachine')}: ${m.name}`}
                           onClick={() => {
                             if (window.confirm(t('deleteMachineConfirm')))
@@ -468,14 +734,51 @@ export default function App() {
                       </div>
                     ))}
                   </section>
+                  {project.floor.segments.length > 0 && (
+                    <section className="panel machine-list">
+                      <div className="section-row">
+                        <h3>
+                          {t('referenceList')}{' '}
+                          <span className="count-badge">{project.floor.segments.length}</span>
+                        </h3>
+                      </div>
+                      <p className="field-help">{t('sharedSegments')}</p>
+                      {project.floor.segments.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`machine-list-row ${segment?.id === item.id ? 'selected' : ''}`}
+                        >
+                          <button onClick={() => selectObject({ type: 'segment', id: item.id })}>
+                            <span className="machine-list-icon">
+                              <Layers3 size={19} />
+                            </span>
+                            <span>
+                              <strong>
+                                {item.name || t('blankName')}{' '}
+                                {item.locked && <LockKeyhole size={12} />}
+                              </strong>
+                              <small>
+                                {t(assetLabels[item.kind])} ·{' '}
+                                <bdi>
+                                  {item.width} × {item.length} m
+                                </bdi>
+                              </small>
+                            </span>
+                          </button>
+                        </div>
+                      ))}
+                    </section>
+                  )}
                   <div className="selected-summary">
                     <span>
-                      {t('selected')}: <strong>{machine.name}</strong>
+                      {t('selected')}: <strong>{segment?.name ?? machine.name}</strong>
                     </span>
-                    <span>
-                      {t('footprintAverage')}:{' '}
-                      <strong>{formatNumber(selectedDemand.averagePressure, locale)} kPa</strong>
-                    </span>
+                    {!segment && (
+                      <span>
+                        {t('footprintAverage')}:{' '}
+                        <strong>{formatNumber(selectedDemand.averagePressure, locale)} kPa</strong>
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Results
@@ -527,7 +830,7 @@ export default function App() {
               <ShieldCheck size={16} />
               {t('engineeringNote')}
             </span>
-            <small>LIVE LOAD / v0.1.0</small>
+            <small>LIVE LOAD / v0.2.0</small>
           </footer>
         </main>
         <dialog

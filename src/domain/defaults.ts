@@ -28,6 +28,10 @@ export function createMachine(name = 'Machine 01'): Machine {
   return {
     id: newId(),
     name,
+    kind: 'machine',
+    height: 1.5,
+    color: 'teal',
+    locked: false,
     mass: null,
     contents: null,
     width: 2,
@@ -81,12 +85,20 @@ export function createProject(example = true): Project {
     scenario.backgroundLoad = 0;
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: example ? 'Mezzanine · equipment study' : 'Untitled assessment',
     site: '',
     codeBasis: '',
     isExample: example,
-    floor: { width: 18, length: 12, type: 'unknown', udlRating: null, beams: [], openings: [] },
+    floor: {
+      width: 18,
+      length: 12,
+      type: 'unknown',
+      udlRating: null,
+      beams: [],
+      openings: [],
+      segments: [],
+    },
     scenarios: [scenario],
     activeScenarioId: scenario.id,
   };

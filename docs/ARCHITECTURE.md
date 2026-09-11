@@ -12,6 +12,16 @@
 
 ## Project data
 
+Schema 2 extends machine records with a load kind, illustrative height, palette color and geometry lock. All weighted presets remain in `scenario.machines`; there is no parallel scene-only load collection. Shared `floor.segments` contains organizational zones and existing structural references. Their geometry informs collision/scope checks, but they do not contribute new applied loads or capacity. Model data remains independent of Three.js.
+
+`src/domain/migrations.ts` validates version 1 with its frozen schema before upgrading. Migration retains IDs, unknowns, mass, geometry and source notes, and clears signed-context snapshots for re-recording. Browser persistence uses a new key and retains the legacy key. Future schema versions and malformed files fail explicitly.
+
+`src/scene/SceneEngine.ts` owns WebGL rendering and controls. React owns persistent inputs. A 3D pointer gesture updates transient mesh transforms and commits once on release; cancellation restores the model. Scene rebuilding disposes geometries, materials and labels. Unmount also disposes controls, observers, listeners, animation requests, shadows and the renderer. WebGL loss offers a 2D fallback. Rendering is requested on change instead of running an unconditional animation loop.
+
+Plan `(x,y)` maps to Three `(x,elevation,y)`, and positive plan angles map to negative world-Y angles. Rotation extraction uses the quaternion's local horizontal axis to avoid Euler-angle folding. Rectangular openings use union-aware slab tiles and actual holes. Camera, active editing tool and label visibility are transient; color and lock are persisted but excluded from canonical physical/evidence snapshots. Stable key ordering keeps evidence current across schema parsing.
+
+`useProjectHistory` uses a bounded immutable history reducer. It retains up to 40 previous project states; a new edit clears redo. Undoing a physical edit restores the exact prior inputs and their evidence snapshots.
+
 One versioned project contains a floor shared by its scenarios. Each scenario contains machines, a concurrent distributed load, a documented-limit declaration and ten evidence records. Each machine has independent supports, contact areas and a reaction input mode.
 
 Unknown numbers are `null`. Zero is an intentional known value. Estimated equal support loading is explicit and cannot complete the documented support evidence or enable the support-limit comparison.

@@ -2,6 +2,7 @@ import type { Project, Scenario } from './schema';
 import { scenarioDemand } from './calculations';
 import { reviewSignature, scoreEvidence } from './evidence';
 import { corners, placementIssues, polygonsOverlap } from './geometry';
+import { segmentIssues } from './scene';
 
 export type Check = {
   key: 'supportCheck' | 'combinedCheck';
@@ -15,7 +16,7 @@ export type AssessmentStatus = 'incomplete' | 'outsideScope' | 'exceeds' | 'with
 export function assess(project: Project, scenario: Scenario) {
   const demand = scenarioDemand(scenario, project.floor);
   const evidence = scoreEvidence(project, scenario);
-  const issues: string[] = [];
+  const issues: string[] = segmentIssues(project.floor, scenario.machines);
   for (const machine of scenario.machines) {
     issues.push(...placementIssues(machine, project.floor));
     if (machine.operation !== 'static') issues.push('dynamicUnassessed');
@@ -39,7 +40,14 @@ export function assess(project: Project, scenario: Scenario) {
     !!review.reference.trim() &&
     reviewCurrent &&
     !issues.some((issue) =>
-      ['outsideFloor', 'overOpening', 'machineOverlap', 'dynamicUnassessed'].includes(issue),
+      [
+        'outsideFloor',
+        'overOpening',
+        'machineOverlap',
+        'dynamicUnassessed',
+        'referenceCollision',
+        'zoneOutside',
+      ].includes(issue),
     );
   const supportedReactions = scenario.machines.every(
     (m, i) => m.reactionMode === 'specified' && demand.machines[i].balanced,
@@ -86,6 +94,8 @@ export function assess(project: Project, scenario: Scenario) {
             'machineOverlap',
             'reviewStale',
             'contactOutsideScope',
+            'referenceCollision',
+            'zoneOutside',
           ].includes(issue),
         )
       ? 'outsideScope'

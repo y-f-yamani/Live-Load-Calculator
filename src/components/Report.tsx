@@ -3,6 +3,7 @@ import { assess } from '../domain/assessment';
 import { machineDemand } from '../domain/calculations';
 import { formatNumber } from '../domain/numbers';
 import { translate, evidenceLabels, type Locale, type MessageKey } from '../i18n/messages';
+import { assetLabels } from '../i18n/sceneLabels';
 
 export function Report({
   project,
@@ -89,6 +90,21 @@ export function Report({
                   strokeWidth=".07"
                 />
               ))}
+              {project.floor.segments.map((segment) => (
+                <rect
+                  key={segment.id}
+                  transform={`translate(${segment.x} ${segment.y}) rotate(${segment.rotation})`}
+                  x={-segment.width / 2}
+                  y={-segment.length / 2}
+                  width={segment.width}
+                  height={segment.length}
+                  fill={segment.kind === 'zone' ? '#e0e9f2' : '#b7c1c9'}
+                  fillOpacity=".5"
+                  stroke="#647b83"
+                  strokeWidth=".04"
+                  strokeDasharray={segment.kind === 'zone' ? '.15 .1' : undefined}
+                />
+              ))}
               {project.floor.openings.map((o) => (
                 <rect
                   key={o.id}
@@ -141,7 +157,9 @@ export function Report({
                     <td>
                       M{i + 1} · {m.name}
                       <br />
-                      {f(m.width)} × {f(m.length)} m
+                      {t(assetLabels[m.kind])}
+                      <br />
+                      {f(m.width)} × {f(m.length)} m · {t('objectHeight')}: {f(m.height)} m
                     </td>
                     <td>
                       {f(m.mass)} + {f(m.contents)}
@@ -159,6 +177,42 @@ export function Report({
                 ))}
               </tbody>
             </table>
+            {project.floor.segments.length > 0 && (
+              <section>
+                <h2>{t('referenceList')}</h2>
+                <p>
+                  {t('referenceNote')} {t('zoneNote')}
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t('segmentName')}</th>
+                      <th>{t('objectType')}</th>
+                      <th>
+                        {t('width')} × {t('length')} × {t('height')} (m)
+                      </th>
+                      <th>X / Y / °</th>
+                      <th>{t('elevation')} (m)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.floor.segments.map((segment) => (
+                      <tr key={segment.id}>
+                        <td>{segment.name}</td>
+                        <td>{t(assetLabels[segment.kind])}</td>
+                        <td dir="ltr">
+                          {f(segment.width)} × {f(segment.length)} × {f(segment.height)}
+                        </td>
+                        <td dir="ltr">
+                          {f(segment.x)} / {f(segment.y)} / {f(segment.rotation)}
+                        </td>
+                        <td>{f(segment.elevation)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
             {scenario.machines.map((m, i) => {
               const d = machineDemand(m);
               return (
@@ -273,7 +327,8 @@ export function Report({
               </tbody>
             </table>
             <footer>
-              {t('version')}: static-load-1.0 · {t('rubric')}: {result.evidence.version} · Schema 1
+              {t('version')}: static-load-1.0 · {t('rubric')}: {result.evidence.version} · Schema{' '}
+              {project.schemaVersion}
             </footer>
           </article>
         );

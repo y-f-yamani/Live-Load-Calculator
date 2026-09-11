@@ -18,7 +18,7 @@ describe('project boundary and persistence', () => {
   });
   it('rejects unknown schema versions, duplicate IDs, extra computed results and invalid active IDs', () => {
     const p = createProject();
-    expect(() => parseProject(JSON.stringify({ ...p, schemaVersion: 2 }))).toThrow();
+    expect(() => parseProject(JSON.stringify({ ...p, schemaVersion: 3 }))).toThrow();
     expect(() =>
       parseProject(JSON.stringify({ ...p, scenarios: [p.scenarios[0], p.scenarios[0]] })),
     ).toThrow();

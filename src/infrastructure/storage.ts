@@ -1,5 +1,7 @@
 import { projectSchema, type Project } from '../domain/schema';
-const STORAGE_KEY = 'live-load.project.v1';
+import { migrateProject } from '../domain/migrations';
+const STORAGE_KEY = 'live-load.project.v2';
+const LEGACY_KEY = 'live-load.project.v1';
 const MAX_BYTES = 2_000_000;
 
 function checkSize(json: string) {
@@ -15,12 +17,14 @@ export function serializeProject(project: Project): string {
 
 export function parseProject(json: string): Project {
   checkSize(json);
-  return projectSchema.parse(JSON.parse(json));
+  return migrateProject(JSON.parse(json));
 }
 
-export function loadProject(): { project: Project | null; error: boolean } {
+export function loadProject(): { project: Project | null; error: boolean; migrated?: boolean } {
   try {
-    const json = localStorage.getItem(STORAGE_KEY);
+    const current = localStorage.getItem(STORAGE_KEY);
+    const json = current ?? localStorage.getItem(LEGACY_KEY);
+    if (!current && json) return { project: parseProject(json), error: false, migrated: true };
     return { project: json ? parseProject(json) : null, error: false };
   } catch {
     return { project: null, error: true };

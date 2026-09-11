@@ -28,8 +28,11 @@ npm run preview       # serve the production build after npm run build
 
 - Full English/Arabic interface, RTL layout, and English/Arabic/bilingual printable reports.
 - Light, dark and system themes with independent saved language preferences.
-- SVG floor editor: drag, rotate, zoom, snap, keyboard movement, support lines and openings.
-- Multiple machines and independent scenario copies for side-by-side comparison.
+- Interactive Three.js 3D editor with orbit/zoom/pan, direct dragging, rotation and resize handles, camera presets and fullscreen.
+- Place machines, pallets, racks, tanks and blocks from an object library; edit dimensions, weight, supports, color and geometry locking.
+- Add shared floor zones and existing wall, beam and column references; actual openings remain gaps in the 3D slab.
+- Switch to the SVG 2D plan; both views use the same coordinates and load records.
+- Duplicate/delete objects, undo/redo up to 40 project edits, and compare independent layouts.
 - Explicit unknown values, machine contents, contact areas and supplier support reactions.
 - Static weight, support-force and contact-pressure calculations with no inferred floor capacity.
 - Reviewed support and combined-load comparisons for a recorded, matching static scenario.
@@ -62,6 +65,7 @@ src/
   hooks/                 Preferences and optional read-only WebMCP integration
   i18n/                  Typed English/Arabic dictionaries
   infrastructure/        Validated local storage and project file boundary
+  scene/                 Three.js meshes, transforms and disposable editor lifecycle
   test/                  Shared regression fixtures
   App.tsx                Application composition and project workflow
   main.tsx               React entry point
@@ -69,13 +73,23 @@ src/
 public/                  Public static assets
 ```
 
-**Stack:** React, TypeScript (strict mode), Vite, Zod, Lucide icons, Vitest, ESLint and Prettier. `package-lock.json` is committed for reproducible installation. Calculations have no dependency on React or browser storage.
+**Stack:** React, TypeScript (strict mode), Vite, Three.js, Zod, Lucide icons, Vitest, ESLint and Prettier. `package-lock.json` is committed for reproducible installation. Calculations have no dependency on React or browser storage.
 
 ## Saving and privacy
 
 Projects remain in the current browser's local storage. No account, analytics, backend, external font service or file-upload service is used. **Export JSON backups** to move between browsers or devices; clearing browser data removes the local copy.
 
-Project files use schema version 1 and have a 2 MB limit for both import and export. A project supports up to 12 scenarios, 30 machines per scenario and 12 support points per machine, subject to that file-size limit. Storage failures are surfaced in the interface. Invalid saved data is preserved while autosave is paused; starting/importing a project explicitly resumes saving.
+Project files use schema version 2 and have a 2 MB limit for both import and export. A project supports up to 12 scenarios, 30 load objects per scenario, 12 support points per object and 40 shared floor segments, subject to that file-size limit. Version 1 files are validated and migrated automatically: inputs and references are preserved, while evidence snapshots and review confirmation must be recorded again. The original version 1 browser save remains untouched as a backup. Invalid saved data is preserved while autosave is paused; starting/importing a project explicitly resumes saving.
+
+## Using the 3D editor
+
+Choose a preset from **Object library**, then click the floor to place it. Desktop users can also drag a preset into the view; **Add at center** provides a keyboard alternative. Select an item and use **Move**, **Rotate** or **Resize**; the inspector provides exact numerical dimensions and positions. Resizing updates support offsets proportionally without inventing weight or contact areas. Use the color swatches and lock control to organize the scene.
+
+Drag empty space to orbit, scroll to zoom, and right-drag to pan. On a touch screen, use one finger to orbit and two fingers to zoom/pan. With the canvas focused, arrow keys move the selection, **R** rotates 15°, **Ctrl/Cmd+D** duplicates, **Delete** removes, and **Escape** cancels a gesture. Undo/redo buttons restore project changes; camera, language and theme remain separate preferences.
+
+All load presets start with unknown weights and reactions. Preset silhouettes, heights, foot markers and slab thickness are illustrative. Floor zones organize the layout; existing structural references do not add strength, capacity or inferred weight. Represent newly added weighted elements as load objects. The editor does not simulate structural deflection or vibration.
+
+3D requires WebGL2 and hardware acceleration. If unavailable, the project remains available in the 2D plan and numerical inspectors. Three.js is loaded in a separate lazy chunk (approximately 152 KB gzipped for the editor in this release).
 
 Do not commit real facility information, engineering assessments, credentials, or exported user projects to a public repository. The committed example contains only fictional values.
 

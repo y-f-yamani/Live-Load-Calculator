@@ -10,7 +10,9 @@ export function transform(point: Point, machine: Pick<Machine, 'x' | 'y' | 'rota
   };
 }
 
-export function corners(machine: Machine): Point[] {
+export function corners(
+  machine: Pick<Machine, 'width' | 'length' | 'x' | 'y' | 'rotation'>,
+): Point[] {
   return [
     { x: -machine.width / 2, y: -machine.length / 2 },
     { x: machine.width / 2, y: -machine.length / 2 },

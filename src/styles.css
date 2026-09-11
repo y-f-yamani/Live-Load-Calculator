@@ -1,5 +1,256 @@
 @layer reset, theme, base, components, responsive, print;
 
+@layer components {
+  .editor-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+  .object-library {
+    padding: 18px;
+  }
+  .object-library > .segmented {
+    margin-block: 15px 12px;
+  }
+  .asset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .asset-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 4px;
+    min-height: 87px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-alt);
+    color: var(--muted);
+    cursor: grab;
+  }
+  .asset-tile span {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .asset-tile:hover,
+  .asset-tile.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .object-library .field-help {
+    margin-top: 12px;
+  }
+  .editor-view-bar,
+  .scene-actions,
+  .three-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .editor-view-bar,
+  .three-tools {
+    justify-content: space-between;
+  }
+  .editor-view-bar {
+    margin-bottom: 12px;
+  }
+  .three-tools {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    background: var(--surface-alt);
+  }
+  .three-tools .segmented button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+  .three-card {
+    overflow: hidden;
+  }
+  .three-stage {
+    position: relative;
+    background: var(--plan-bg);
+  }
+  .three-viewport {
+    height: 530px;
+    position: relative;
+    overflow: hidden;
+    direction: ltr;
+  }
+  .three-viewport canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  .three-label-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .three-object-label {
+    padding: 4px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--text);
+    font:
+      500 10px/1.4 'Segoe UI',
+      Tahoma,
+      sans-serif;
+    white-space: nowrap;
+    max-width: 230px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    box-shadow: 0 2px 8px #0001;
+    direction: auto;
+  }
+  .three-fallback,
+  .three-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 22px;
+    padding: 40px;
+    text-align: center;
+  }
+  .three-fallback {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-alt);
+    color: var(--muted);
+  }
+  .three-loading {
+    min-height: 530px;
+  }
+  .three-fallback p {
+    max-width: 430px;
+  }
+  .placement-ribbon {
+    position: absolute;
+    inset-inline: 16px;
+    top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 9px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    font-size: 12px;
+  }
+  .camera-presets {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .camera-presets button {
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 11px;
+  }
+  .camera-presets button:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .three-card:fullscreen {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-radius: 0;
+  }
+  .three-card:fullscreen .three-stage {
+    flex: 1;
+    min-height: 0;
+  }
+  .three-card:fullscreen .three-viewport {
+    height: 100%;
+  }
+  .geometry-fields {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+  }
+  .geometry-fields:disabled {
+    opacity: 0.6;
+  }
+  .scene-appearance {
+    border-block: 1px solid var(--border);
+    padding-block: 13px;
+    margin-block: 16px;
+  }
+  .scene-appearance .text-button {
+    font-size: 11px;
+  }
+  .color-palette {
+    display: flex;
+    gap: 9px;
+    margin-top: 12px;
+  }
+  .color-palette button {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    border: 3px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .color-palette button.selected {
+    box-shadow: 0 0 0 2px var(--text);
+  }
+  .segment-plan-shape {
+    cursor: pointer;
+  }
+}
+@layer responsive {
+  @media (max-width: 1100px) {
+    .three-viewport {
+      height: 480px;
+    }
+  }
+  @media (max-width: 650px) {
+    .three-viewport {
+      height: 420px;
+    }
+    .three-tools .segmented button {
+      padding: 8px 6px;
+      font-size: 11px;
+    }
+    .three-tools {
+      padding: 8px;
+      gap: 6px;
+    }
+    .three-card .plan-toolbar {
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .placement-ribbon {
+      inset-inline: 8px;
+      top: 8px;
+    }
+    .three-fallback {
+      padding: 22px;
+    }
+    .three-card .plan-footer {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  }
+}
+
 @layer reset {
   *,
   *::before,
